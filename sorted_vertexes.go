@@ -4,9 +4,7 @@ import "container/list"
 
 type SortedVertexes struct {
 	*list.List
-
 }
-
 
 func NewSortedVertexes() *SortedVertexes {
 	l := list.New()

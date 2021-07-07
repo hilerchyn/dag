@@ -3,6 +3,7 @@ package dag
 import (
 	"container/list"
 	"errors"
+	"log"
 )
 
 type Vertex struct {
@@ -27,7 +28,7 @@ func (v *Vertex) RemoveChild(hash string) {
 	for e := v.Children.Front(); e != nil; e = e.Next() {
 		val, ok := e.Value.(*Vertex)
 		if !ok {
-			panic(errors.New("type error"))
+			log.Println(errors.New("type error"))
 		}
 
 		if val.Hash == hash {
@@ -41,7 +42,7 @@ func (v *Vertex) RemoveParent(hash string) {
 	for e := v.Parents.Front(); e != nil; e = e.Next() {
 		val, ok := e.Value.(*Vertex)
 		if !ok {
-			panic(errors.New("type error"))
+			log.Println(errors.New("type error"))
 		}
 
 		if val.Hash == hash {
