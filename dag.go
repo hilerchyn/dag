@@ -1,6 +1,10 @@
 package dag
 
-import "errors"
+import (
+	"errors"
+	"log"
+	"sync"
+)
 
 var (
 	ErrCycle           = errors.New("dag: cycle between edges")
@@ -10,30 +14,32 @@ var (
 )
 
 type DAG struct {
-	Vertexes map[string]*Vertex
+	Vertexes *sync.Map //map[string]*Vertex
 }
 
 func NewDAG() *DAG {
 	return &DAG{
-		Vertexes: make(map[string]*Vertex),
+		Vertexes: &sync.Map{}, // make(map[string]*Vertex),
 	}
 }
 
 func (dag *DAG) AddVertex(vertex *Vertex) error {
-	if _, ok := dag.Vertexes[vertex.Hash]; ok {
+	if _, ok := dag.Vertexes.Load(vertex.Hash); ok {
 		return ErrVertexExists
 	}
 
-	dag.Vertexes[vertex.Hash] = vertex
+	dag.Vertexes.Store(vertex.Hash, vertex)
 
 	return nil
 }
 
 func (dag *DAG) RemoveVertex(vertex *Vertex) {
-	v, ok := dag.Vertexes[vertex.Hash]
+	vItem, ok := dag.Vertexes.Load(vertex.Hash)
 	if !ok {
 		return
 	}
+
+	v := vItem.(*Vertex)
 
 	for eParent := v.Parents.Front(); eParent != nil; eParent.Next() {
 		eParent.Value.(*Vertex).RemoveChild(vertex.Hash)
@@ -43,8 +49,7 @@ func (dag *DAG) RemoveVertex(vertex *Vertex) {
 		eChild.Value.(*Vertex).RemoveParent(vertex.Hash)
 	}
 
-	delete(dag.Vertexes, vertex.Hash)
-
+	dag.Vertexes.Delete(vertex.Hash)
 }
 
 func (dag *DAG) AddEdge(from, to *Vertex) error {
@@ -52,15 +57,17 @@ func (dag *DAG) AddEdge(from, to *Vertex) error {
 		return ErrCycle
 	}
 
-	fromV, ok := dag.Vertexes[from.Hash]
+	fromVItem, ok := dag.Vertexes.Load(from.Hash)
 	if !ok {
 		return ErrVertexNotExists
 	}
+	fromV := fromVItem.(*Vertex)
 
-	toV, ok := dag.Vertexes[to.Hash]
+	toVItem, ok := dag.Vertexes.Load(to.Hash)
 	if !ok {
 		return ErrVertexNotExists
 	}
+	toV := toVItem.(*Vertex)
 
 	for e := fromV.Children.Front(); e != nil; e.Next() {
 		if e.Value.(*Vertex).IsEqual(to) {
@@ -80,15 +87,17 @@ func (dag *DAG) AddEdge(from, to *Vertex) error {
 
 func (dag *DAG) RemoveEdge(from, to *Vertex) error {
 
-	fromV, ok := dag.Vertexes[from.Hash]
+	fromVItem, ok := dag.Vertexes.Load(from.Hash)
 	if !ok {
 		return ErrVertexNotExists
 	}
+	fromV := fromVItem.(*Vertex)
 
-	toV, ok := dag.Vertexes[to.Hash]
+	toVItem, ok := dag.Vertexes.Load(to.Hash)
 	if !ok {
 		return ErrVertexNotExists
 	}
+	toV := toVItem.(*Vertex)
 
 	fromV.RemoveChild(toV.Hash)
 	toV.RemoveParent(fromV.Hash)
@@ -97,15 +106,17 @@ func (dag *DAG) RemoveEdge(from, to *Vertex) error {
 
 func (dag *DAG) EdgeExists(from, to *Vertex) (bool, error) {
 
-	fromV, ok := dag.Vertexes[from.Hash]
+	fromVItem, ok := dag.Vertexes.Load(from.Hash)
 	if !ok {
 		return false, ErrVertexNotExists
 	}
+	fromV := fromVItem.(*Vertex)
 
-	toV, ok := dag.Vertexes[to.Hash]
+	toVItem, ok := dag.Vertexes.Load(to.Hash)
 	if !ok {
 		return false, ErrVertexNotExists
 	}
+	toV := toVItem.(*Vertex)
 
 	// quick return
 	if toV.Parents.Len() == 0 {
@@ -122,8 +133,8 @@ func (dag *DAG) EdgeExists(from, to *Vertex) (bool, error) {
 }
 
 func (dag *DAG) GetVertex(hash string) *Vertex {
-	if v, ok := dag.Vertexes[hash]; ok {
-		return v
+	if v, ok := dag.Vertexes.Load(hash); ok {
+		return v.(*Vertex)
 	}
 
 	return nil
@@ -136,11 +147,12 @@ func (dag *DAG) DepthFirstSearch(fromVertexHash, toVertexHash string) bool {
 }
 
 func (dag *DAG) dfs(found map[string]bool, vertexId string) {
-	vertex, ok := dag.Vertexes[vertexId]
+	vertexItem, ok := dag.Vertexes.Load(vertexId)
 	if !ok {
 		return
 	}
 
+	vertex := vertexItem.(*Vertex)
 	for eChild := vertex.Children.Front(); eChild != nil; eChild.Next() {
 		hash := eChild.Value.(*Vertex).Hash
 		if !found[hash] {
@@ -151,20 +163,36 @@ func (dag *DAG) dfs(found map[string]bool, vertexId string) {
 
 }
 
-func (dag *DAG) IsEqual(dagC *DAG) bool {
-	if len(dag.Vertexes) != len(dagC.Vertexes) {
-		return false
-	}
-	for vHash, v := range dag.Vertexes {
-		vC, ok := dagC.Vertexes[vHash]
+func (dag *DAG) IsEqual(dagC *DAG) (result bool) {
+
+	// sync.Map 无法直接比较长度
+	/*
+		if len(dag.Vertexes) != len(dagC.Vertexes) {
+			return false
+		}
+	*/
+
+	var check = func(vHash, value interface{}) bool {
+		result = false
+
+		v := value.(*Vertex)
+		vCItem, ok := dagC.Vertexes.Load(vHash)
 		if !ok {
-			return false
+			return result
 		}
+		vC := vCItem.(*Vertex)
 		if !v.IsEqual(vC) {
-			return false
+			return result
 		}
+
+		result = true
+
+		return result
 	}
-	return true
+
+	dag.Vertexes.Range(check)
+
+	return result
 }
 
 // Copy shallow Copy
@@ -172,33 +200,38 @@ func (dag *DAG) Copy() *DAG {
 	dagNew := NewDAG()
 
 	// copy vertexes
-	for _, v := range dag.Vertexes {
-		dagNew.Vertexes[v.Hash] = &Vertex{
-			Hash:  v.Hash,
-			Value: v.Value,
-			Type:  v.Type,
-		}
-	}
+	dag.Vertexes.Range(func(hash, value interface{}) bool {
+		dagNew.Vertexes.Store(hash, value)
+		return true
+	})
 
 	// copy edges
-	for _, v := range dag.Vertexes {
+	dag.Vertexes.Range(func(hash, value interface{}) bool {
+		v := value.(*Vertex)
 		for eChild := v.Children.Front(); eChild != nil; eChild.Next() {
 			err := dagNew.AddEdge(v, eChild.Value.(*Vertex))
 			if err != nil {
-				panic(err)
-				//return nil
+				//panic(err)
+				log.Println(err)
+				return false
 			}
 		}
-	}
+
+		return true
+	})
+
 	return dagNew
 }
 
 func (dag *DAG) Print() (str string) {
-	for _, v := range dag.Vertexes {
+	dag.Vertexes.Range(func(hash, value interface{}) bool {
+		v := value.(*Vertex)
 		if v.Parents.Len() == 0 {
 			str = str + dag.print(v, "") + "\n"
 		}
-	}
+
+		return true
+	})
 	return str
 }
 
@@ -218,6 +251,8 @@ func (dag *DAG) print(root *Vertex, prefix string) string {
 	}
 	return str
 }
+
+/*
 
 // TopologicalSort get the vertexes without parents
 func (dag *DAG) TopologicalSort() []*Vertex {
@@ -277,3 +312,6 @@ func (dag *DAG) TopologicalSortStable() []*Vertex {
 
 	return sort
 }
+
+
+*/
