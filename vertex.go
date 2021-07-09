@@ -53,11 +53,43 @@ func (v *Vertex) RemoveParent(hash string) {
 }
 
 func (v *Vertex) IsEqual(vC *Vertex) bool {
-	if v.Hash != vC.Hash {
+
+	/*
+		经过测试，无法使用指针地址类比对是否相等，原因如下：
+		1、所有的顶点都存储与sync.Map中
+		2、比对时使用的是顶点的Parents和Children类型为*list.List
+		3、从sync.Map中Load顶点数据时，应该是值传递，或者 向 *list.List PushBack 时 使用的是值传递，导致无法指针匹配
+		srcPointer := fmt.Sprintf("%p", v)
+		destPointer := fmt.Sprintf("%p", vC)
+		if strings.Compare(srcPointer, destPointer) == 0 {
+			log.Println("compare pointer: ", srcPointer, destPointer, strings.Compare(srcPointer, destPointer))
+		}
+		if strings.Compare(v.Hash, vC.Hash) == 0 {
+			log.Println("compare hash: ", v.Hash, vC.Hash, srcPointer, destPointer, strings.Compare(srcPointer, destPointer))
+		}
+
+		if strings.Compare(srcPointer, destPointer) != 0{
+			return false
+		}
+		log.Println(srcPointer, destPointer)
+	*/
+
+	// 因此此处，只通过比对Hash值来判定该值是否相等，
+	if v.Hash == vC.Hash {
+		return true
+	}
+
+	/*
+		if v.Hash != vC.Hash {
+			return true
+		}
+	*/
+
+	if v.Parents.Len() != vC.Parents.Len() {
 		return false
 	}
 
-	if v.Parents.Len() != vC.Parents.Len() {
+	if v.Children.Len() != vC.Children.Len() {
 		return false
 	}
 
@@ -69,12 +101,8 @@ func (v *Vertex) IsEqual(vC *Vertex) bool {
 			return false
 		}
 
-		e.Next()
-		eC.Next()
-	}
-
-	if v.Children.Len() != vC.Children.Len() {
-		return false
+		e = e.Next()
+		eC = eC.Next()
 	}
 
 	return true
