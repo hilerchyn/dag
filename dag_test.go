@@ -158,3 +158,44 @@ func Test_MapListPointer(t *testing.T) {
 	}
 
 }
+
+func Test_DagStore(t *testing.T) {
+	MAX := 5
+
+	dagNew := NewDAG()
+	root := NewVertex("genesis", "000000", "the genesis block")
+	dagNew.AddVertex(root)
+	for i := 0; i < MAX; i++ {
+		if i == 0 {
+			continue
+		}
+		v := NewVertex("TX", fmt.Sprintf("%d", i), "transaction")
+		dagNew.AddVertex(v)
+	}
+
+	for from := 0; from < MAX-1; from++ {
+		fromHash := fmt.Sprintf("%d", from)
+		if from == 0 {
+			fromHash = "000000"
+		}
+		for to := 1; to < MAX; to++ {
+			dagNew.AddEdge(
+				NewVertex("TX", fromHash, "transaction"), // {Hash: fmt.Sprintf("%d", from), Type: "TX", Value: "transaction"},
+				NewVertex("TX", fmt.Sprintf("%d", to), "transaction"),
+			)
+		}
+	}
+
+	t.Log(dagNew.AddEdge(
+		NewVertex("TX", fmt.Sprintf("%d", 2), "transaction"), // {Hash: fmt.Sprintf("%d", from), Type: "TX", Value: "transaction"},
+		NewVertex("TX", fmt.Sprintf("%d", 4), "transaction"),
+	))
+
+	dagNew.Store("./data")
+}
+
+func Test_DagLoad(t *testing.T) {
+	dagNew := NewDAG()
+	dagNew.Load("./data")
+	t.Log(dagNew.Print("000000"))
+}

@@ -3,6 +3,7 @@ package dag
 import (
 	"errors"
 	"fmt"
+	"github.com/dgraph-io/badger/v3"
 	"log"
 	"sync"
 )
@@ -17,6 +18,8 @@ var (
 type DAG struct {
 	Vertexes *sync.Map //map[string]*Vertex
 	Length   int
+
+	badgerDB *badger.DB
 }
 
 func NewDAG() *DAG {
