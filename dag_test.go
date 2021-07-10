@@ -1,8 +1,11 @@
 package dag
 
 import (
+	"container/list"
 	"fmt"
+	"log"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -102,5 +105,56 @@ func TestNewSortedVertexes(t *testing.T) {
 	))
 
 	t.Log(dagNew.Print("000000"))
+
+}
+
+func Test_MapListPointer(t *testing.T) {
+
+	type MyMap struct {
+		Items *sync.Map
+	}
+
+	type MyList struct {
+		Items *list.List
+	}
+
+	type Item struct {
+		Name string
+		Type string
+	}
+
+	myMap := &MyMap{
+		Items: &sync.Map{},
+	}
+
+	myList := &MyList{
+		Items: list.New(),
+	}
+
+	original := &Item{Type: "TEST"}
+
+	myMap.Items.Store("test", original)
+	myList.Items.PushBack(original)
+
+	log.Println(fmt.Sprintf("%p", original))
+
+	v, ok := myMap.Items.Load("test")
+	if ok {
+		log.Println(fmt.Sprintf("%p", v))
+		log.Println(fmt.Sprintf("%p", v.(*Item)))
+	}
+	myMap.Items.Range(func(key, v interface{}) bool {
+		log.Println(key)
+
+		log.Println(fmt.Sprintf("%p", v))
+		log.Println(fmt.Sprintf("%p", v.(*Item)))
+
+		return true
+	})
+
+	for e := myList.Items.Front(); e != nil; e = e.Next() {
+		log.Println(fmt.Sprintf("%p", e.Value))
+		log.Println(fmt.Sprintf("%p", e.Value.(*Item)))
+	}
 
 }
