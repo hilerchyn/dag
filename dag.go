@@ -2,6 +2,7 @@ package dag
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 )
@@ -74,7 +75,10 @@ func (dag *DAG) AddEdge(from, to *Vertex) error {
 	toV := toVItem.(*Vertex)
 
 	for e := fromV.Children.Front(); e != nil; e = e.Next() {
-		if e.Value.(*Vertex).IsEqual(to) {
+
+		//fmt.Printf("fromt pointer: %p %s, to pointer: %p %s, child pointer: %p %s \n", fromV, fromV.Hash, toV, toV.Hash, e.Value, e.Value.(*Vertex).Hash)
+
+		if e.Value.(*Vertex).IsEqualPointer(fmt.Sprintf("%p", to)) {
 			return ErrEdgeExists
 		}
 	}
@@ -128,7 +132,7 @@ func (dag *DAG) EdgeExists(from, to *Vertex) (bool, error) {
 	}
 
 	for eChild := fromV.Children.Front(); eChild != nil; eChild = eChild.Next() {
-		if eChild.Value.(*Vertex).IsEqual(toV) {
+		if eChild.Value.(*Vertex).IsEqualPointer(fmt.Sprintf("%p", toV)) {
 			return true, nil
 		}
 	}
@@ -182,7 +186,7 @@ func (dag *DAG) IsEqual(dagC *DAG) (result bool) {
 			return result
 		}
 		vC := vCItem.(*Vertex)
-		if !v.IsEqual(vC) {
+		if !v.IsEqualPointer(fmt.Sprintf("%p", vC)) {
 			return result
 		}
 
