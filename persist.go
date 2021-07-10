@@ -16,7 +16,10 @@ const (
 func (dag *DAG) Store(path string) {
 	// Open the Badger database located in the /tmp/badger directory.
 	// It will be created if it doesn't exist.
-	db, err := badger.Open(badger.DefaultOptions(path))
+	options := badger.DefaultOptions(path)
+	options.NumMemtables = 100
+	options.NumCompactors = 100
+	db, err := badger.Open(options)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -160,7 +160,7 @@ func Test_MapListPointer(t *testing.T) {
 }
 
 func Test_DagStore(t *testing.T) {
-	MAX := 5
+	MAX := 100000
 
 	dagNew := NewDAG()
 	root := NewVertex("genesis", "000000", "the genesis block")
@@ -173,7 +173,7 @@ func Test_DagStore(t *testing.T) {
 		dagNew.AddVertex(v)
 	}
 
-	for from := 0; from < MAX-1; from++ {
+	for from := 0; from < 1; from++ {
 		fromHash := fmt.Sprintf("%d", from)
 		if from == 0 {
 			fromHash = "000000"

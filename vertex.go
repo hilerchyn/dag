@@ -9,6 +9,7 @@ import (
 )
 
 type Vertex struct {
+	// @todo 使用sync.Map替换 list.List 提高监测速度
 	Parents  *list.List
 	Children *list.List
 	Value    interface{}
