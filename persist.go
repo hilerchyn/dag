@@ -79,32 +79,31 @@ func (dag *DAG) Store(path string) {
 		// 存储children
 		vert := value.(*Vertex)
 		flag := 0
-		if vert.Children.Len() > 0 {
-			for e := vert.Children.Front(); e != nil; e = e.Next() {
-				//log.Println("children: ", vert.Hash, fmt.Sprintf(KeyFormatterChildren, vert.Hash, flag), e.Value.(*Vertex).Hash)
-				err := txn.Set(
+		vert.Children.Range(func(key, value interface{}) bool {
+			//log.Println("children: ", vert.Hash, fmt.Sprintf(KeyFormatterChildren, vert.Hash, flag), e.Value.(*Vertex).Hash)
+			err := txn.Set(
+				[]byte(fmt.Sprintf(KeyFormatterChildren, vert.Hash, flag)),
+				[]byte(value.(*Vertex).Hash),
+			)
+
+			switch err {
+			case badger.ErrTxnTooBig:
+				_ = txn.Commit()
+				txn = db.NewTransaction(true)
+				_ = txn.Set(
 					[]byte(fmt.Sprintf(KeyFormatterChildren, vert.Hash, flag)),
-					[]byte(e.Value.(*Vertex).Hash),
+					[]byte(value.(*Vertex).Hash),
 				)
-
-				switch err {
-				case badger.ErrTxnTooBig:
-					_ = txn.Commit()
-					txn = db.NewTransaction(true)
-					_ = txn.Set(
-						[]byte(fmt.Sprintf(KeyFormatterChildren, vert.Hash, flag)),
-						[]byte(e.Value.(*Vertex).Hash),
-					)
-				case nil:
-					break
-				default:
-					return false
-				}
-
-				flag++
+			case nil:
+				break
+			default:
+				return false
 			}
 
-		}
+			flag++
+
+			return true
+		})
 
 		vertexIndex++
 		return true

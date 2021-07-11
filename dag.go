@@ -41,20 +41,23 @@ func (dag *DAG) AddVertex(vertex *Vertex) error {
 }
 
 func (dag *DAG) RemoveVertex(vertex *Vertex) {
-	vItem, ok := dag.Vertexes.Load(vertex.Hash)
+	_, ok := dag.Vertexes.Load(vertex.Hash)
 	if !ok {
 		return
 	}
 
-	v := vItem.(*Vertex)
+	// @todo 有删除的必要吗？后续的delete直接删除掉了。
+	//v := vItem.(*Vertex)
+	/*
+		for eParent := v.Parents.Front(); eParent != nil; eParent = eParent.Next() {
+			eParent.Value.(*Vertex).RemoveChild(vertex.Hash)
+		}
 
-	for eParent := v.Parents.Front(); eParent != nil; eParent = eParent.Next() {
-		eParent.Value.(*Vertex).RemoveChild(vertex.Hash)
-	}
+		for eChild := v.Children.Front(); eChild != nil; eChild = eChild.Next() {
+			eChild.Value.(*Vertex).RemoveParent(vertex.Hash)
+		}
 
-	for eChild := v.Children.Front(); eChild != nil; eChild = eChild.Next() {
-		eChild.Value.(*Vertex).RemoveParent(vertex.Hash)
-	}
+	*/
 
 	dag.Vertexes.Delete(vertex.Hash)
 	dag.Length--
@@ -77,21 +80,17 @@ func (dag *DAG) AddEdge(from, to *Vertex) error {
 	}
 	toV := toVItem.(*Vertex)
 
-	for e := fromV.Children.Front(); e != nil; e = e.Next() {
-
-		//fmt.Printf("fromt pointer: %p %s, to pointer: %p %s, child pointer: %p %s \n", fromV, fromV.Hash, toV, toV.Hash, e.Value, e.Value.(*Vertex).Hash)
-
-		if e.Value.(*Vertex).IsEqualPointer(fmt.Sprintf("%p", to)) {
-			return ErrEdgeExists
-		}
+	v, ok := fromV.Children.Load(toV.Hash)
+	if ok && v.(*Vertex).IsEqualPointer(fmt.Sprintf("%p", to)) {
+		return ErrEdgeExists
 	}
 
 	if dag.DepthFirstSearch(toV.Hash, fromV.Hash) {
 		return ErrCycle
 	}
 
-	fromV.Children.PushBack(toV)
-	toV.Parents.PushBack(fromV)
+	fromV.Children.Store(toV.Hash, toV)
+	toV.Parents.Store(fromV.Hash, fromV)
 
 	return nil
 }
@@ -129,15 +128,9 @@ func (dag *DAG) EdgeExists(from, to *Vertex) (bool, error) {
 	}
 	toV := toVItem.(*Vertex)
 
-	// quick return
-	if toV.Parents.Len() == 0 {
-		return false, nil
-	}
-
-	for eChild := fromV.Children.Front(); eChild != nil; eChild = eChild.Next() {
-		if eChild.Value.(*Vertex).IsEqualPointer(fmt.Sprintf("%p", toV)) {
-			return true, nil
-		}
+	v, ok := fromV.Children.Load(toV.Hash)
+	if ok && v.(*Vertex).IsEqualPointer(fmt.Sprintf("%p", to)) {
+		return true, nil
 	}
 
 	return false, nil
@@ -164,13 +157,16 @@ func (dag *DAG) dfs(found map[string]bool, vertexId string) {
 	}
 
 	vertex := vertexItem.(*Vertex)
-	for eChild := vertex.Children.Front(); eChild != nil; eChild = eChild.Next() {
-		hash := eChild.Value.(*Vertex).Hash
+
+	vertex.Children.Range(func(key, value interface{}) bool {
+
+		hash := value.(*Vertex).Hash
 		if !found[hash] {
 			found[hash] = true
 			dag.dfs(found, hash)
 		}
-	}
+		return true
+	})
 
 }
 
@@ -217,14 +213,17 @@ func (dag *DAG) Copy() *DAG {
 	// copy edges
 	dag.Vertexes.Range(func(hash, value interface{}) bool {
 		v := value.(*Vertex)
-		for eChild := v.Children.Front(); eChild != nil; eChild = eChild.Next() {
-			err := dagNew.AddEdge(v, eChild.Value.(*Vertex))
+
+		v.Children.Range(func(key, value interface{}) bool {
+
+			err := dagNew.AddEdge(v, value.(*Vertex))
 			if err != nil {
-				//panic(err)
 				log.Println(err)
 				return false
 			}
-		}
+
+			return true
+		})
 
 		return true
 	})
@@ -261,16 +260,13 @@ func (dag *DAG) print(root *Vertex, prefix string) string {
 
 	str := prefix + root.Hash + "\n"
 
-	for eChild := root.Children.Front(); eChild != nil; eChild = eChild.Next() {
-		child := eChild.Value.(*Vertex)
+	root.Children.Range(func(key, value interface{}) bool {
 
-		if child.Children.Len() == 0 {
-			str = str + dag.print(child, prefix+"    ")
-		} else {
-			str = str + dag.print(child, prefix+"    |")
-		}
+		child := value.(*Vertex)
+		str = str + dag.print(child, prefix+"    |")
 
-	}
+		return true
+	})
 
 	return str
 }
@@ -283,13 +279,17 @@ func (dag *DAG) TopologicalSort() []*Vertex {
 	copyV.Vertexes.Range(func(hash, value interface{}) bool {
 		v := value.(*Vertex)
 
-		if v.Parents.Len() != 0 {
-			return true
-		}
-		for eChild := v.Children.Front(); eChild != nil; eChild = eChild.Next() {
-			child := eChild.Value.(*Vertex)
-			child.RemoveChild(v.Hash)
-		}
+		/*
+			@todo 重新实现
+			if v.Parents.Len() != 0 {
+				return true
+			}
+			for eChild := v.Children.Front(); eChild != nil; eChild = eChild.Next() {
+				child := eChild.Value.(*Vertex)
+				child.RemoveChild(v.Hash)
+			}
+
+		*/
 		copyV.Vertexes.Delete(v.Hash)
 
 		// get the vertex without parents, the first one is the ROOT Vertex
